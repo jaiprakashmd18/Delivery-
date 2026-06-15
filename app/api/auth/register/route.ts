@@ -5,7 +5,9 @@ import prisma from "@/lib/prisma";
 import { generateReferralCode } from "@/lib/utils";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY ?? "re_placeholder");
+}
 
 const registerSchema = z
   .object({
@@ -172,7 +174,7 @@ export async function POST(req: NextRequest) {
 
     // Send welcome email (non-blocking)
     try {
-      await resend.emails.send({
+      await getResend().emails.send({
         from: "StudentExpress Georgia <noreply@studentexpress.ge>",
         to: email,
         subject: "Welcome to StudentExpress Georgia! 🎉",

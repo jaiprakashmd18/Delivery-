@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import React, { useState } from "react";
 import { Plus, Trash2, ShoppingCart, CheckCircle } from "lucide-react";
