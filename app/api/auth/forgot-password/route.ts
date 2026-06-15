@@ -4,7 +4,9 @@ import crypto from "crypto";
 import prisma from "@/lib/prisma";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY ?? "re_placeholder");
+}
 
 const forgotPasswordSchema = z.object({
   email: z
@@ -73,7 +75,7 @@ export async function POST(req: NextRequest) {
 
     // Send reset email
     try {
-      await resend.emails.send({
+      await getResend().emails.send({
         from: "StudentExpress Georgia <noreply@studentexpress.ge>",
         to: email,
         subject: "Reset your StudentExpress password",

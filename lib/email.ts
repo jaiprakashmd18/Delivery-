@@ -1,6 +1,13 @@
 import { Resend } from "resend";
 
-export const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-initialize so missing key during build doesn't throw
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) {
+    _resend = new Resend(process.env.RESEND_API_KEY ?? "re_placeholder");
+  }
+  return _resend;
+}
 
 export const FROM_EMAIL = "StudentExpress Georgia <noreply@studentexpress.ge>";
 
@@ -109,7 +116,7 @@ export async function sendOrderConfirmation(
 </body>
 </html>`;
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM_EMAIL,
     to,
     subject: `შეკვეთა #${orderNumber} დადასტურებულია — StudentExpress Georgia`,
@@ -179,7 +186,7 @@ export async function sendWelcomeEmail(
 </body>
 </html>`;
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM_EMAIL,
     to,
     subject: `მოგესალმებით StudentExpress Georgia-ში, ${name}!`,
@@ -249,7 +256,7 @@ export async function sendPasswordReset(
 </body>
 </html>`;
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM_EMAIL,
     to,
     subject: "პაროლის აღდგენა — StudentExpress Georgia",
@@ -317,7 +324,7 @@ export async function sendOTPEmail(to: string, otp: string): Promise<void> {
 </body>
 </html>`;
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM_EMAIL,
     to,
     subject: `${otp} — თქვენი StudentExpress ვერიფიკაციის კოდი`,
@@ -415,7 +422,7 @@ export async function sendDeliveryUpdate(
 </body>
 </html>`;
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM_EMAIL,
     to,
     subject: `შეკვეთა #${orderNumber} — ${statusInfo.label}`,

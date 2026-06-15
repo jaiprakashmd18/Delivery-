@@ -3,7 +3,9 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY ?? "re_placeholder");
+}
 
 const sendOtpSchema = z
   .object({
@@ -79,7 +81,7 @@ export async function POST(req: NextRequest) {
     if (email) {
       // Send via email using Resend
       try {
-        await resend.emails.send({
+        await getResend().emails.send({
           from: "StudentExpress Georgia <noreply@studentexpress.ge>",
           to: email,
           subject: "Your StudentExpress OTP Code",

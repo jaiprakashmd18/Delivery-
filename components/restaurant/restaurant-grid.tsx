@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { cn } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import { RestaurantCard } from "./restaurant-card";
@@ -14,6 +15,7 @@ export async function RestaurantGrid({
   className,
   emptyMessage = "No restaurants found.",
 }: RestaurantGridProps) {
+  noStore();
   let restaurants: RestaurantWithDetails[];
   if (propRestaurants) {
     restaurants = propRestaurants;
