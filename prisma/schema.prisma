@@ -1,0 +1,674 @@
+// StudentExpress Georgia - Prisma Schema
+// MongoDB Atlas
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum UserRole {
+  CUSTOMER
+  DELIVERY_PARTNER
+  RESTAURANT_OWNER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  PICKED_UP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum OrderType {
+  FOOD
+  PERSONAL_PICKUP
+  GROCERY
+  PARCEL
+}
+
+enum PaymentMethod {
+  CASH_ON_DELIVERY
+  CARD
+  BANK_TRANSFER
+  WALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum DeliveryPartnerStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+}
+
+enum NotificationType {
+  ORDER_UPDATE
+  PROMOTION
+  SYSTEM
+  PAYMENT
+  DELIVERY
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ==================== MODELS ====================
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  phone         String?   @unique
+  image         String?
+  password      String?
+  role          UserRole  @default(CUSTOMER)
+  isActive      Boolean   @default(true)
+  isVerified    Boolean   @default(false)
+
+  // Student info
+  studentId   String?
+  university  String?
+  studentYear String?
+
+  // Referral
+  referralCode    String?  @unique
+  referredBy      String?  @db.ObjectId
+
+  // Settings
+  notificationsEnabled Boolean @default(true)
+  pushSubscription     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  accounts         Account[]
+  sessions         Session[]
+  orders           Order[]          @relation("CustomerOrders")
+  addresses        Address[]
+  reviews          Review[]
+  notifications    Notification[]
+  wallet           Wallet?
+  referrals        Referral[]       @relation("ReferralUser")
+  referredUsers    Referral[]       @relation("ReferredUser")
+  supportTickets   SupportTicket[]
+  restaurantsOwned Restaurant[]     @relation("RestaurantOwner")
+  deliveryPartner  DeliveryPartner?
+  favorites        Favorite[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model OTPToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  phone     String
+  email     String?
+  token     String
+  expires   DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("otp_tokens")
+}
+
+model Restaurant {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String  @unique
+  description String?
+  image       String?
+  coverImage  String?
+
+  // Location
+  address     String
+  city        String  @default("Tbilisi")
+  latitude    Float?
+  longitude   Float?
+
+  // Contact
+  phone       String?
+  email       String?
+  website     String?
+
+  // Business
+  ownerId         String  @db.ObjectId
+  isActive        Boolean @default(true)
+  isVerified      Boolean @default(false)
+  isFeatured      Boolean @default(false)
+
+  // Delivery
+  deliveryFee     Float   @default(3.0)
+  minOrderAmount  Float   @default(10.0)
+  deliveryRadius  Float   @default(5.0)
+  avgDeliveryTime Int     @default(30)
+
+  // Ratings
+  rating      Float @default(0)
+  totalRatings Int   @default(0)
+
+  // Hours
+  openingHours Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  owner       User                 @relation("RestaurantOwner", fields: [ownerId], references: [id])
+  categories  RestaurantCategory[]
+  menuItems   MenuItem[]
+  orders      Order[]
+  reviews     Review[]
+  favorites   Favorite[]
+
+  @@map("restaurants")
+}
+
+model RestaurantCategory {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  restaurantId String     @db.ObjectId
+  name         String
+  description  String?
+  image        String?
+  sortOrder    Int        @default(0)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItems  MenuItem[]
+
+  @@map("restaurant_categories")
+}
+
+model MenuItem {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  restaurantId String  @db.ObjectId
+  categoryId   String? @db.ObjectId
+
+  name        String
+  description String?
+  image       String?
+  price       Float
+
+  // Details
+  isAvailable  Boolean  @default(true)
+  isVeg        Boolean  @default(false)
+  isPopular    Boolean  @default(false)
+  isFeatured   Boolean  @default(false)
+  spiceLevel   Int?
+  calories     Int?
+  allergens    String[]
+
+  // Customization
+  addOns       Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category   RestaurantCategory? @relation(fields: [categoryId], references: [id])
+  orderItems OrderItem[]
+
+  @@map("menu_items")
+}
+
+model Address {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+
+  label       String  @default("Home")
+  fullAddress String
+  apartment   String?
+  landmark    String?
+  city        String  @default("Tbilisi")
+  latitude    Float?
+  longitude   Float?
+  isDefault   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
+}
+
+model Order {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  orderNumber String @unique
+
+  customerId    String  @db.ObjectId
+  restaurantId  String? @db.ObjectId
+  deliveryPartnerId String? @db.ObjectId
+  addressId     String? @db.ObjectId
+
+  type   OrderType   @default(FOOD)
+  status OrderStatus @default(PENDING)
+
+  // Pricing
+  subtotal      Float
+  deliveryFee   Float  @default(0)
+  tax           Float  @default(0)
+  discount      Float  @default(0)
+  total         Float
+
+  // Payment
+  paymentMethod PaymentMethod @default(CASH_ON_DELIVERY)
+  paymentStatus PaymentStatus @default(PENDING)
+
+  // Details
+  deliveryAddress  String
+  deliveryLatitude Float?
+  deliveryLongitude Float?
+  notes           String?
+
+  // Timestamps
+  acceptedAt   DateTime?
+  preparedAt   DateTime?
+  pickedUpAt   DateTime?
+  deliveredAt  DateTime?
+  cancelledAt  DateTime?
+
+  // ETA
+  estimatedDeliveryTime Int?
+
+  // For personal pickup / parcel orders
+  pickupRestaurantName    String?
+  pickupRestaurantAddress String?
+  foodDescription         String?
+  screenshotUrl           String?
+  receiverName            String?
+  receiverPhone           String?
+  parcelDescription       String?
+  parcelWeight            Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer        User              @relation("CustomerOrders", fields: [customerId], references: [id])
+  restaurant      Restaurant?       @relation(fields: [restaurantId], references: [id])
+  deliveryPartner DeliveryPartner?  @relation(fields: [deliveryPartnerId], references: [id])
+  address         Address?          @relation(fields: [addressId], references: [id])
+  items           OrderItem[]
+  review          Review?
+  payment         Payment?
+  trackingUpdates OrderTracking[]
+  couponUsage     CouponUsage?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  orderId    String @db.ObjectId
+  menuItemId String @db.ObjectId
+
+  quantity   Int
+  unitPrice  Float
+  totalPrice Float
+  addOns     Json?
+  notes      String?
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderTracking {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  orderId String @db.ObjectId
+
+  status    OrderStatus
+  message   String
+  latitude  Float?
+  longitude Float?
+
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_tracking")
+}
+
+model DeliveryPartner {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+
+  vehicleType   String?
+  vehicleNumber String?
+  licenseNumber String?
+
+  isActive       Boolean               @default(true)
+  isVerified     Boolean               @default(false)
+  status         DeliveryPartnerStatus @default(OFFLINE)
+
+  currentLatitude  Float?
+  currentLongitude Float?
+
+  // Earnings
+  totalEarnings Float @default(0)
+  pendingPayout Float @default(0)
+
+  // Stats
+  totalDeliveries    Int   @default(0)
+  completedDeliveries Int  @default(0)
+  rating             Float @default(0)
+  totalRatings       Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("delivery_partners")
+}
+
+model Review {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String  @db.ObjectId
+  restaurantId String? @db.ObjectId
+  orderId      String? @unique @db.ObjectId
+
+  rating  Int
+  comment String?
+  images  String[]
+
+  // Delivery review
+  deliveryRating Int?
+  deliveryComment String?
+
+  isVerified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id])
+  order      Order?      @relation(fields: [orderId], references: [id])
+
+  @@map("reviews")
+}
+
+model Coupon {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  code String @unique
+
+  description     String?
+  discountType    String  // "percentage" | "fixed"
+  discountValue   Float
+  minOrderAmount  Float   @default(0)
+  maxDiscount     Float?
+
+  usageLimit      Int?
+  usageCount      Int    @default(0)
+  perUserLimit    Int    @default(1)
+
+  isActive    Boolean   @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+
+  applicableFor String[] // ["food", "grocery", "parcel", "pickup"]
+  restaurantIds String[] @db.ObjectId
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usages CouponUsage[]
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  couponId String @db.ObjectId
+  userId   String @db.ObjectId
+  orderId  String @unique @db.ObjectId
+
+  discountAmount Float
+  createdAt      DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id])
+
+  @@map("coupon_usages")
+}
+
+model Payment {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  orderId String @unique @db.ObjectId
+
+  amount        Float
+  currency      String         @default("GEL")
+  method        PaymentMethod
+  status        PaymentStatus  @default(PENDING)
+  transactionId String?
+
+  metadata  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+model Wallet {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+
+  balance        Float @default(0)
+  rewardPoints   Int   @default(0)
+  cashbackEarned Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  walletId String @db.ObjectId
+
+  type        String // "credit" | "debit"
+  amount      Float
+  description String
+  reference   String?
+
+  createdAt DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("wallet_transactions")
+}
+
+model Referral {
+  id             String @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String @db.ObjectId
+  referredUserId String @db.ObjectId
+
+  status       String @default("pending") // "pending" | "completed"
+  rewardAmount Float  @default(0)
+
+  createdAt DateTime @default(now())
+
+  user        User @relation("ReferralUser", fields: [userId], references: [id])
+  referredUser User @relation("ReferredUser", fields: [referredUserId], references: [id])
+
+  @@map("referrals")
+}
+
+model Notification {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+
+  type    NotificationType
+  title   String
+  message String
+  data    Json?
+  isRead  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model SupportTicket {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+
+  subject     String
+  description String
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  category    String?
+  orderId     String?
+
+  attachments String[]
+
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id])
+  messages TicketMessage[]
+
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId String @db.ObjectId
+
+  senderId   String
+  senderRole String // "customer" | "admin"
+  message    String
+  attachments String[]
+
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("ticket_messages")
+}
+
+model Favorite {
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String @db.ObjectId
+  restaurantId String @db.ObjectId
+
+  createdAt DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, restaurantId])
+  @@map("favorites")
+}
+
+model Banner {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+
+  title       String
+  subtitle    String?
+  image       String
+  link        String?
+  buttonText  String?
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("banners")
+}
+
+model AppSettings {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  key   String @unique
+  value String
+
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}

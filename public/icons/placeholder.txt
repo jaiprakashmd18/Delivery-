@@ -1,0 +1,26 @@
+PRODUCTION ICONS REQUIRED
+=========================
+
+This directory must contain the following PNG icon files before deploying to production:
+
+  icon-192x192.png    — Android home screen icon (192x192 px)
+  icon-512x512.png    — Android splash / Play Store icon (512x512 px)
+  apple-touch-icon.png — iOS home screen icon (180x180 px)
+
+DESIGN SPECS
+------------
+- Background color : #FF6B00 (brand orange)
+- Icon / logo      : White StudentExpress "SE" mark or full logo centered
+- Safe zone        : Keep artwork within 80% of canvas (maskable icon safe area)
+- Format           : PNG-32, no interlacing
+- The 512x512 file is also used as the maskable icon (purpose: "maskable")
+  so ensure the logo fits within the inner 80% circle.
+
+TOOLS
+-----
+Generate icons quickly with:
+  • https://maskable.app/editor  (maskable preview)
+  • https://realfavicongenerator.net
+  • https://pwa-asset-generator (npm package)
+
+Also add a favicon.ico (32x32 or multi-size) to /public/ for browser tab support.
