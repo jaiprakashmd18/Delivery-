@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useTheme } from "next-themes"
+import { useSession, signOut } from "next-auth/react"
 import {
   ShoppingCart,
   Sun,
@@ -12,6 +13,8 @@ import {
   ClipboardList,
   Settings,
   LogOut,
+  ShieldCheck,
+  Bike,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -34,13 +37,6 @@ import {
 import { useCartStore } from "@/store/cart-store"
 import { cn } from "@/lib/utils"
 
-// TODO: Replace with real auth state
-type User = {
-  name: string
-  email: string
-  avatar?: string
-}
-
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/restaurants", label: "Restaurants" },
@@ -53,9 +49,8 @@ export function Navbar() {
   const { theme, setTheme } = useTheme()
   const [scrolled, setScrolled] = React.useState(false)
   const [mobileOpen, setMobileOpen] = React.useState(false)
-
-  // TODO: Replace with real auth state
-  const [user, setUser] = React.useState<User | null>(null)
+  const { data: session } = useSession()
+  const user = session?.user
 
   const itemCount = useCartStore(
     (state) => state.items.reduce((acc, item) => acc + item.quantity, 0)
@@ -68,6 +63,14 @@ export function Navbar() {
     window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  const role = (user as { role?: string })?.role
+
+  const dashboardHref =
+    role === "ADMIN" ? "/admin" :
+    role === "RESTAURANT_OWNER" ? "/restaurant" :
+    role === "DELIVERY_PARTNER" ? "/delivery" :
+    "/dashboard"
 
   const getInitials = (name: string) =>
     name
@@ -150,11 +153,11 @@ export function Navbar() {
                   aria-label="User menu"
                 >
                   <Avatar className="h-8 w-8">
-                    {user.avatar && (
-                      <AvatarImage src={user.avatar} alt={user.name} />
+                    {user.image && (
+                      <AvatarImage src={user.image} alt={user.name ?? ""} />
                     )}
                     <AvatarFallback className="bg-[#FF6B00] text-white text-xs font-bold">
-                      {getInitials(user.name)}
+                      {getInitials(user.name ?? user.email ?? "U")}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -170,27 +173,39 @@ export function Navbar() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer">
+                  <Link href={dashboardHref} className="flex items-center gap-2 cursor-pointer">
                     <LayoutDashboard className="h-4 w-4" />
                     Dashboard
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/orders" className="flex items-center gap-2 cursor-pointer">
-                    <ClipboardList className="h-4 w-4" />
-                    My Orders
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
-                    <Settings className="h-4 w-4" />
-                    Settings
-                  </Link>
-                </DropdownMenuItem>
+                {role === "CUSTOMER" && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/orders" className="flex items-center gap-2 cursor-pointer">
+                      <ClipboardList className="h-4 w-4" />
+                      My Orders
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {role === "ADMIN" && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin" className="flex items-center gap-2 cursor-pointer">
+                      <ShieldCheck className="h-4 w-4" />
+                      Admin Panel
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {role === "DELIVERY_PARTNER" && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/delivery" className="flex items-center gap-2 cursor-pointer">
+                      <Bike className="h-4 w-4" />
+                      Delivery App
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
-                  onClick={() => setUser(null)}
+                  onClick={() => signOut({ callbackUrl: "/" })}
                 >
                   <LogOut className="h-4 w-4" />
                   Sign Out
@@ -198,7 +213,7 @@ export function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Link href="/auth/login" className="hidden sm:inline-flex">
+            <Link href="/login" className="hidden sm:inline-flex">
               <Button variant="default" size="sm">
                 Sign In
               </Button>
@@ -235,9 +250,17 @@ export function Navbar() {
                     {link.label}
                   </Link>
                 ))}
-                {!user && (
+                {user ? (
+                  <button
+                    onClick={() => { setMobileOpen(false); signOut({ callbackUrl: "/" }); }}
+                    className="mt-4 flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors w-full"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </button>
+                ) : (
                   <Link
-                    href="/auth/login"
+                    href="/login"
                     onClick={() => setMobileOpen(false)}
                     className="mt-4"
                   >
