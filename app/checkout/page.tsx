@@ -58,7 +58,8 @@ export default function CheckoutPage() {
       const data = await res.json();
       if (res.ok) {
         clearCart();
-        router.push(`/checkout/success?order=${data.orderNumber}`);
+        const orderNumber = data.data?.orderNumber ?? data.orderNumber;
+        router.push(`/checkout/success?order=${orderNumber}`);
       } else {
         toast.error(data.error || "Failed to place order. Please try again.");
       }

@@ -86,7 +86,59 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    const { generateOrderNumber } = await import('@/lib/utils');
 
+    // Direct checkout flow: items + deliveryAddress string
+    if (body.deliveryAddress && !body.deliveryAddressId) {
+      const {
+        items, restaurantId, deliveryAddress, notes, paymentMethod,
+        subtotal, deliveryFee, tax, discount, total,
+      } = body;
+
+      if (!items?.length) {
+        return NextResponse.json({ success: false, error: 'No items provided' }, { status: 400 });
+      }
+
+      const menuItemIds = items.map((i: { menuItemId: string }) => i.menuItemId);
+      const menuItems = await prisma.menuItem.findMany({
+        where: { id: { in: menuItemIds }, isAvailable: true },
+      });
+
+      const orderItems = items.map((item: { menuItemId: string; quantity: number }) => {
+        const mi = menuItems.find((m) => m.id === item.menuItemId);
+        if (!mi) throw new Error(`Menu item ${item.menuItemId} not found`);
+        return {
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          unitPrice: mi.price,
+          totalPrice: mi.price * item.quantity,
+        };
+      });
+
+      const order = await prisma.order.create({
+        data: {
+          orderNumber: generateOrderNumber(),
+          customerId: session.user.id,
+          restaurantId: restaurantId || null,
+          type: restaurantId ? 'FOOD' : 'PERSONAL_PICKUP',
+          status: 'PENDING',
+          subtotal: subtotal ?? orderItems.reduce((s: number, i: { totalPrice: number }) => s + i.totalPrice, 0),
+          deliveryFee: deliveryFee ?? 3,
+          tax: tax ?? 0,
+          discount: discount ?? 0,
+          total: total ?? orderItems.reduce((s: number, i: { totalPrice: number }) => s + i.totalPrice, 0) + (deliveryFee ?? 3),
+          paymentMethod: paymentMethod ?? 'CASH_ON_DELIVERY',
+          paymentStatus: 'PENDING',
+          deliveryAddress,
+          notes: notes || null,
+          items: { create: orderItems },
+        },
+      });
+
+      return NextResponse.json({ success: true, data: order }, { status: 201 });
+    }
+
+    // Address-ID flow (used by proper checkout with saved addresses)
     const { placeOrder } = await import('@/actions/orders');
     const result = await placeOrder(body);
 
